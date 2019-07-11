@@ -14,6 +14,7 @@ library(purrr)
 library(data.table)
 library(car)
 library(ggplot2)
+library(futile.logger)
 
 # Functions used in the server file
 p_value_distr_num <-
@@ -26,7 +27,7 @@ p_value_distr_num <-
            P_VALUE_LOWER,
            P_VALUE_UPPER) {
     p_values = c()
-    print("Step 1")
+    flog.info("Step 1")
     for (y in c(1:ITERATIONS)) {
       s = sample(final_df[final_df$target == TARGET_POSITIVE, c(column_name)], SAMPLE_SIZE)
       t = sample(final_df[final_df$target == TARGET_NEGATIVE, c(column_name)], SAMPLE_SIZE)
@@ -52,7 +53,7 @@ p_value_distr_graph_nnorm_num <-
            P_VALUE_LOWER,
            P_VALUE_UPPER) {
     p_values = c()
-    print("Step 1")
+    flog.info("Step 1")
     for (y in c(1:ITERATIONS)) {
       s = sample(final_df[final_df$target == TARGET_POSITIVE, c(column_name)], SAMPLE_SIZE)
       t = sample(final_df[final_df$target == TARGET_NEGATIVE, c(column_name)], SAMPLE_SIZE)
@@ -94,7 +95,7 @@ fun <-
     
     #Parametric Way
     temp = input %>% select(usable_features$column_names) %>% select_if(is.numeric) %>% imap_dfr(function(x, name) {
-      print(name)
+      flog.info(name)
       p_value_distr_num(
         input,
         name,
@@ -123,7 +124,7 @@ fun <-
     
     #Non Parametric Way
     temp = input %>% select(usable_features$column_names) %>% select_if(is.numeric) %>% imap_dfr(function(x, name) {
-      print(name)
+      flog.info(name)
       p_value_distr_graph_nnorm_num(
         input,
         name,
@@ -161,21 +162,19 @@ fun <-
         return(c(name, s$p.value))
       },
       error = function(cond) {
-        message(paste("Column caused an error:", name))
-        #message("Here's the original warning message:")
-        #message(cond)
+        flog.error(paste("Column caused an error:", name))
+        #flog.info("Here's the original warning flog.info:")
+        #flog.info(cond)
         # Choose a return value in case of error
         return(c(name, NA))
       },
       warning = function(cond) {
-        message(paste("Column caused a warning:", name))
-        #message("Here's the original warning message:")
-        #message(cond)
+        flog.warn(paste("Column caused a warning:", name))
         # Choose a return value in case of warning
         return(c(name, NULL))
       },
       finally = {
-        message(paste("Processed column:", name))
+        flog.info(paste("Processed column:", name))
       })
       return(out)
     })
@@ -251,17 +250,16 @@ fun <-
     
     table(all_merged_better$is_numeric)
     
-    all_merged_better[is.na(all_merged_better$is_numeric), ]$is_numeric <-
+    #Added in if clause as what if no feature has a missing value or NA
+    if(sum(is.na(all_merged_better$is_numeric)) > 0){
+      all_merged_better[is.na(all_merged_better$is_numeric), ]$is_numeric <-
       0
-    
-    table(all_merged_better$is_numeric)
+    }
     
     all_merged_better$p_values_levene_test = NULL
     all_merged_better$p_values_shapiro_test = NULL
     
-    table(all_merged_better$useful_features)
-    
-    table(all_merged_better$useful_features_np)
+    all_merged_better <- 
     
     return(all_merged_better)
   }
@@ -391,3 +389,4 @@ server <- function(input, output) {
 
 # Run the application
 shinyApp(ui = ui, server = server)
+  
